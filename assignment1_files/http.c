@@ -84,7 +84,7 @@ int client (char* hostname, char* port, char* request) {
     int sendbyte = send_to(sockfd, request, p, strlen(request)+1 );
 
     // TODO: receiving http response
-	int readbyte = read_from(sockfd, buf, p, 1024);
+	// int readbyte = read_from(sockfd, buf, p, 1024);
 
     freeaddrinfo(servinfo); // all done with this structure
 	close(sockfd);
