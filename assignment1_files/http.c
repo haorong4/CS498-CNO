@@ -13,16 +13,22 @@
 
 #define PORT "3490" // the port client will be connecting to 
 #define MAXDATASIZE 100 // max number of bytes we can get at once 
+#define FILE_NOT_FOUND -99
 
 size_t CONNECT_STATUS = 0;
 
 void *get_in_addr(struct sockaddr *sa);
-int client(char* hostname, char* port, char* request);
+int client(char* hostname, char* port, char* request, char* filename);
 char** split(char* input, char delimiter);
 char** parse_http(char* input);
 void free_array_char(char** array );
 ssize_t send_to(int sockfd, char* buf, struct addrinfo* p, size_t count);
 ssize_t read_from(int sockfd, char* buf, struct addrinfo* p, size_t count);
+ssize_t write_to_file(const char* filename, char* buf, size_t count);
+
+void print_array(char** array);
+size_t length_array(char** array); 
+void destroy_array(char** array);
 
 
 int main(int argc, char *argv[]){
@@ -33,11 +39,14 @@ int main(int argc, char *argv[]){
     }
     char** request = parse_http(argv[1]);
 
-    client("0.0.0.0", "8000", "GET /test.txt HTTP/1.0");
+    //TODO: build http get request from request array.
+    client(request[0], request[1], "GET /test.sql HTTP/1.0 \r\nHost: 0.0.0.0 \r\n Connection: close\r\n\r\n", request[3]);
+    
+    destroy_array(request);
     return 0;
 }
 
-int client (char* hostname, char* port, char* request) {
+int client (char* hostname, char* port, char* request, char* filename) {
 	int sockfd, numbytes;  
 	char buf[1024];
 	struct addrinfo hints, *servinfo, *p;
@@ -79,12 +88,15 @@ int client (char* hostname, char* port, char* request) {
 			s, sizeof s);
 	printf("client: connecting to %s\n", s);
 
-
-    // TODO: sending http request
+    // sending http request 
     int sendbyte = send_to(sockfd, request, p, strlen(request)+1 );
+    fprintf(stderr, "HTTP sendbyte: %d / %lu\n", sendbyte, strlen(request)+1);
+    // receiving http response
+	int readbyte = read_from(sockfd, buf, p, 1024);
+    fprintf(stderr, "HTTP Buffer: %s\n", buf);
 
-    // TODO: receiving http response
-	// int readbyte = read_from(sockfd, buf, p, 1024);
+    // writing buf to file
+    write_to_file(filename, buf, readbyte);
 
     freeaddrinfo(servinfo); // all done with this structure
 	close(sockfd);
@@ -93,11 +105,8 @@ int client (char* hostname, char* port, char* request) {
 }
 
 ssize_t send_to(int sockfd, char* buf, struct addrinfo* p, size_t count){
-    //TODO: implement function to send message to given socket, in HTTP format.
-
     size_t bytesTotal = 0; // total number of bytes read
     ssize_t bytesRead = 0; // number of bytes read in one single recv()
-
     while (bytesTotal < count){
         bytesRead = sendto(sockfd, buf + bytesTotal, count - bytesTotal, 0, p->ai_addr, p->ai_addrlen);
         if (bytesRead == 0){
@@ -110,23 +119,40 @@ ssize_t send_to(int sockfd, char* buf, struct addrinfo* p, size_t count){
             return -1;
         }
     }
-    buf[bytesTotal] = '\0';   
     fprintf(stderr, "http::send_to sent '%s'\n",buf);
     return bytesTotal;
 }
 
 
 ssize_t read_from(int sockfd, char* buf, struct addrinfo* p, size_t count){
-    //TODO: implement function to receive message from given socket, in HTTP format.
+    char header[1024];
+    ssize_t header_length = recv(sockfd, header, count, 0);
+    header[header_length] = '\0';
+    char** headers = split(header, '\n');
+
+    print_array(headers);
+    
+
+    if (strcmp(headers[0], "HTTP/1.0 200 OK\r")){
+        fprintf( stderr, "ERROR: %s\n", headers[0]);
+    }
+    size_t content_length;
+    sscanf( headers[4] ,"Content-Length: %zu\r", &content_length);
+    fprintf(stderr, "Header length: %zd, content_length: %zu\n", header_length, content_length);
+    destroy_array(headers);
+
+
     // int numbytes = -99;
     size_t bytesTotal = 0; // total number of bytes read
     ssize_t bytesRead = 0; // number of bytes read in one single recv()
 
-    while (bytesTotal < count){
-        bytesRead = recv(sockfd, buf + bytesTotal, count - bytesTotal, 0);
+    while (bytesTotal < content_length){
+        bytesRead = recv(sockfd, buf + bytesTotal, content_length - bytesTotal, 0);
+        fprintf(stderr, "bytes Read this turn: %zd", bytesRead);
         if (bytesRead == 0){
             fprintf( stderr, "http::read_from connection closed\n");
-            return bytesTotal;
+            break;
+            // return bytesTotal;
         } else if (bytesRead > 0){
             bytesTotal += bytesRead;
         } else {
@@ -134,9 +160,24 @@ ssize_t read_from(int sockfd, char* buf, struct addrinfo* p, size_t count){
             return -1;
         }
     }
-    buf[bytesTotal] = '\0';   
-    fprintf(stderr, "http::read_from received '%s'\n",buf);
+    buf[bytesTotal] = '\0';   //TODO: MARK for possible segfault;
+    fprintf(stderr, "http::read_from received %zu \n",bytesTotal);
     return bytesTotal;
+}
+
+ssize_t write_to_file(const char* filename, char* buf, size_t count){
+
+    FILE* file = fopen(filename,"w");
+
+    if (file){
+        fwrite(buf, count, 1, file);
+    } else {
+        fprintf(stderr, "open file failed: %s\n", filename);
+        return -1;
+    }
+
+    fclose(file);
+    return count;
 }
 
 char** split(char* input, char delimiter) {
@@ -231,52 +272,49 @@ char** parse_http(char* input){
         return NULL;
     }
 
-    char** output = calloc(4, sizeof(char*));
+    char** output = calloc(5, sizeof(char*));
     output[0] = strndup(argument, index1);
     output[1] = strndup(argument + index1 + 1, index2-index1-1);
     output[2] = strndup(argument + index2, length - index2);
-    output[3] = NULL;
+    output[3] = strndup(argument + check_valid + 1, length - check_valid);
+    output[4] = NULL;
 
-    fprintf(stderr, "good: %s, %s, %s\n", output[0], output[1], output[2]);
+    fprintf(stderr, "good: %s, %s, %s, filename: %s\n", output[0], output[1], output[2], output[3]);
     free(argument);
     return output;
 }
 
 
+void destroy_array(char** array) {
+    char** temp = array;
+    while(*array){
+        free(*array);
+        array += 1;
+    }
+    free(temp);
+    return;
+}
 
 
-// ssize_t read_all_from_socket(int socket, char *buffer, size_t count) {
-//     size_t offset = 0;
-//     ssize_t num = 0;
-//     while(offset < count){
-//       num = read(socket, buffer + offset, count - offset);
-//       if(num == 0){
-//         return 0;
-//       } else if(num > 0){
-//         offset += num;
-//       } else if(num == -1 && errno == EINTR){
-//         continue;
-//       } else {
-//         return -1;
-//       }
-//     }
-//     return count;
-// }
+size_t length_array(char** array) {
+    char** temp = array;
+    size_t count = 0;
+    while(*temp){
+        count += 1;
+        temp += 1;
+    }
+    return count;
+}
 
-// ssize_t write_all_to_socket(int socket, const char *buffer, size_t count) {
-//   size_t offset = 0;
-//   ssize_t num = 0;
-//   while(offset < count){
-//     num = write(socket, buffer + offset, count - offset);
-//     if(num == 0){
-//       return 0;
-//     } else if(num > 0){
-//       offset += num;
-//     } else if(num == -1 && errno == EINTR){
-//       continue;
-//     } else {
-//       return -1;
-//     }
-//   }
-//   return count;
-// }
+void print_array(char** array) {
+    char** temp = array;
+    size_t count = 0;
+    fprintf(stderr, "   Print Array:\n");
+    while(*temp && count < 20){
+        fprintf(stderr, "       index %zu:%s\n", count ,*temp);
+        count += 1;
+        temp += 1;
+    }
+    return;
+}
+
