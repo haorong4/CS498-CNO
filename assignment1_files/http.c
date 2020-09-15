@@ -154,7 +154,7 @@ ssize_t read_from(int sockfd, char** buffer, struct addrinfo* p, size_t count){
     size_t bytesTotal = 0; // total number of bytes read
     ssize_t bytesRead = 0; // number of bytes read in one single recv()
     size_t buffer_szie = 2048;
-    char* buf = calloc(2048, sizeof(char));
+    char* buf = (char*)calloc(2048, sizeof(char));
 
     while (1){
         
