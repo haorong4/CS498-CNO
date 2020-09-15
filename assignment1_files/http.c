@@ -199,7 +199,7 @@ char** split(char* input, char delimiter) {
         count++;
       }
     }
-    char** output = calloc(count+2 , sizeof(char*));
+    char** output = (char**)calloc(count+2 , sizeof(char*));
     int i = 0;
     char* temp = line;
     for(; i < count+1; i++){
@@ -238,7 +238,7 @@ char** parse_http(char* input){
         fprintf(stderr, "INVALIDPROTOCOL" );
         return NULL;
     }
-    char* example = "http://hostname[:port]/path_to_file";
+    // char* example = "http://hostname[:port]/path_to_file";
     char* argument  = strdup(input+7);
     input[7] = '\0';
     char* header = strdup(input);
@@ -279,7 +279,7 @@ char** parse_http(char* input){
         return NULL;
     }
 
-    char** output = calloc(5, sizeof(char*));
+    char** output = (char**)calloc(5, sizeof(char*));
     output[0] = strndup(argument, index1);
     output[1] = strndup(argument + index1 + 1, index2-index1-1);
     output[2] = strndup(argument + index2, length - index2);
@@ -294,8 +294,8 @@ char** parse_http(char* input){
 
 char* create_request (char *hostname, char *file_path)
 {
-    char* request = calloc(1024, sizeof(char));
-    char* buf = calloc(1024, sizeof(char));
+    char* request = (char*)calloc(1024, sizeof(char));
+    char* buf = (char*)calloc(1024, sizeof(char));
     // buffer_appendf(request_buffer, "GET %s HTTP/1.0\r\n", file_path);
     sprintf(buf, "GET %s HTTP/1.0\r\n", file_path);
     strcat(request, buf);
