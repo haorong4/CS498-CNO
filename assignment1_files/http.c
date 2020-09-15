@@ -45,7 +45,7 @@ int main(int argc, char *argv[]){
     }
     char* http_request = create_request (request[0], request[2]);
     //TODO: build http get request from request array.
-    client(request[0], request[1], http_request, request[3]);
+    client(request[0], request[1], http_request, "output");
 
     free(http_request);
     destroy_array(request);
