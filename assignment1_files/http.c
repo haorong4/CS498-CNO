@@ -98,6 +98,7 @@ int client (char* hostname, char* port, char* request, char* filename) {
     int sendbyte = send_to(sockfd, request, p, strlen(request)+1 );
     
     // receiving http response
+    fprintf(stderr, "HTTP Buffer: %s\n", buf);
 	int readbyte = read_from(sockfd, buf, p, 1024);
     fprintf(stderr, "HTTP Buffer: %s\n", buf);
 
@@ -167,7 +168,7 @@ ssize_t read_from(int sockfd, char* buf, struct addrinfo* p, size_t count){
             bytesTotal += bytesRead;
             if (bytesTotal >= (buffer_szie - count)){
                 buffer_szie *= 2;
-                buf = (char*)realloc(buf,buffer_szie);
+                buf = (char*)realloc(buf, buffer_szie);
             }
         } else {
             fprintf( stderr, "http::read_from error: read failed\n");
