@@ -54,7 +54,7 @@ int main(int argc, char *argv[]){
 
 int client (char* hostname, char* port, char* request, char* filename) {
 	int sockfd, numbytes;  
-	char buf[1024];
+	char* buf = (char*) calloc(2048, sizeof(char));
 	struct addrinfo hints, *servinfo, *p;
 	int rv;
 	char s[INET6_ADDRSTRLEN];
@@ -96,14 +96,15 @@ int client (char* hostname, char* port, char* request, char* filename) {
 
     // sending http request 
     int sendbyte = send_to(sockfd, request, p, strlen(request)+1 );
-    fprintf(stderr, "HTTP sendbyte: %d / %lu\n", sendbyte, strlen(request)+1);
+    
     // receiving http response
 	int readbyte = read_from(sockfd, buf, p, 1024);
-    fprintf(stderr, "HTTP Buffer: %s\n", buf);
+    // fprintf(stderr, "HTTP Buffer: %s\n", buf);
 
     // writing buf to file
     write_to_file(filename, buf, readbyte);
 
+    // free(buf);
     freeaddrinfo(servinfo); // all done with this structure
 	close(sockfd);
 
@@ -125,35 +126,38 @@ ssize_t send_to(int sockfd, char* buf, struct addrinfo* p, size_t count){
             return -1;
         }
     }
-    fprintf(stderr, "http::send_to sent '%s'\n",buf);
+    // fprintf(stderr, "http::send_to sent '%s'\n",buf);
     return bytesTotal;
 }
 
 
 ssize_t read_from(int sockfd, char* buf, struct addrinfo* p, size_t count){
-    char header[1024];
-    ssize_t header_length = recv(sockfd, header, count, 0);
-    header[header_length] = '\0';
-    char** headers = split(header, '\n');
+    // char header[1024];
+    // ssize_t header_length = recv(sockfd, header, count, 0);
+    // header[header_length] = '\0';
+    // char** headers = split(header, '\n');
 
-    print_array(headers);
+    // print_array(headers);
     
 
-    if (strcmp(headers[0], "HTTP/1.0 200 OK\r")){
-        fprintf( stderr, "ERROR: %s\n", headers[0]);
-    }
-    size_t content_length;
-    sscanf( headers[4] ,"Content-Length: %zu\r", &content_length); //TODO: possible mistake
-    fprintf(stderr, "Header length: %zd, content_length: %zu\n", header_length, content_length);
-    destroy_array(headers);
+    // if (strcmp(headers[0], "HTTP/1.0 200 OK\r")){
+    //     fprintf( stderr, "ERROR: %s\n", headers[0]);
+    // }
+    // size_t content_length;
+    // sscanf( headers[4] ,"Content-Length: %zu\r", &content_length); //TODO: possible mistake
+    // fprintf(stderr, "Header length: %zd, content_length: %zu\n", header_length, content_length);
+    // destroy_array(headers);
 
 
     // int numbytes = -99;
     size_t bytesTotal = 0; // total number of bytes read
     ssize_t bytesRead = 0; // number of bytes read in one single recv()
+    size_t buffer_szie = 2048;
 
-    while (bytesTotal < content_length){
-        bytesRead = recv(sockfd, buf + bytesTotal, content_length - bytesTotal, 0);
+    while (1){
+        
+        // bytesRead = recv(sockfd, buf + bytesTotal, count, 0);
+        bytesRead = read(sockfd, buf + bytesTotal, count);
         fprintf(stderr, "bytes Read this turn: %zd", bytesRead);
         if (bytesRead == 0){
             fprintf( stderr, "http::read_from connection closed\n");
@@ -161,13 +165,17 @@ ssize_t read_from(int sockfd, char* buf, struct addrinfo* p, size_t count){
             // return bytesTotal;
         } else if (bytesRead > 0){
             bytesTotal += bytesRead;
+            if (bytesTotal >= (buffer_szie - count)){
+                buffer_szie *= 2;
+                buf = (char*)realloc(buf,buffer_szie);
+            }
         } else {
             fprintf( stderr, "http::read_from error: read failed\n");
             return -1;
         }
     }
     buf[bytesTotal] = '\0';   //TODO: MARK for possible segfault;
-    fprintf(stderr, "http::read_from received %zu \n",bytesTotal);
+    fprintf(stderr, "http::read_from received %zu , Buffer Size %zu\n",bytesTotal, buffer_szie);
     return bytesTotal;
 }
 
@@ -175,15 +183,33 @@ ssize_t write_to_file(const char* filename, char* buf, size_t count){
 
     FILE* file = fopen(filename,"w");
 
-    if (file){
-        fwrite(buf, count, 1, file);
-    } else {
+    if (!file){
         fprintf(stderr, "open file failed: %s\n", filename);
         return -1;
-    }
+    } 
 
+    size_t limit = 1024;
+    size_t bytesTotal = 0; // total number of bytes read
+    ssize_t bytesWriten = 0; // number of bytes read in one single recv()
+    while (bytesTotal < count){
+        if ( limit > (count - bytesTotal) ){
+            limit = count - bytesTotal;
+        }
+        bytesWriten = fwrite(buf + bytesTotal, limit, 1, file);
+        if (bytesWriten == 0){
+            fprintf( stderr, "http::write_to finished\n");
+            break;
+        } else if (bytesWriten > 0){
+            fprintf( stderr, "http::write_to: %zu/%zu\n", bytesTotal, count);
+            bytesTotal += limit;
+        } else {
+            fprintf( stderr, "http::rite_to error: write failed\n");
+            return -1;
+        }
+    }
+    fprintf(stderr, "http::Write to total: '%zu'\n",bytesTotal);
     fclose(file);
-    return count;
+    return bytesTotal;
 }
 
 char** split(char* input, char delimiter) {
@@ -286,7 +312,7 @@ char** parse_http(char* input){
     output[3] = strndup(argument + check_valid + 1, length - check_valid);
     output[4] = NULL;
 
-    fprintf(stderr, "good: %s, %s, %s, filename: %s\n", output[0], output[1], output[2], output[3]);
+    // fprintf(stderr, "good: %s, %s, %s, filename: %s\n", output[0], output[1], output[2], output[3]);
     free(argument);
     return output;
 }
@@ -304,7 +330,7 @@ char* create_request (char *hostname, char *file_path)
     strcat(request, "Connection: close\r\n\r\n");
 
     free(buf);
-    fprintf(stderr, "Create Request: %s", request);
+    // fprintf(stderr, "Create Request: %s", request);
     return request;
 }
 
