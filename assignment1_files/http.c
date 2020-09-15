@@ -25,7 +25,7 @@ char** parse_http(char* input);
 char* create_request (char *hostname, char *file_path);
 void free_array_char(char** array );
 ssize_t send_to(int sockfd, char* buf, struct addrinfo* p, size_t count);
-ssize_t read_from(int sockfd, char* buf, struct addrinfo* p, size_t count);
+ssize_t read_from(int sockfd, char** buffer, struct addrinfo* p, size_t count);
 ssize_t write_to_file(const char* filename, char* buf, size_t count);
 
 void print_array(char** array);
@@ -55,7 +55,7 @@ int main(int argc, char *argv[]){
 
 int client (char* hostname, char* port, char* request, char* filename) {
 	int sockfd, numbytes;  
-	char* buf = (char*) calloc(2048, sizeof(char));
+	char* buf;
 	struct addrinfo hints, *servinfo, *p;
 	int rv;
 	char s[INET6_ADDRSTRLEN];
@@ -100,7 +100,7 @@ int client (char* hostname, char* port, char* request, char* filename) {
     
     // receiving http response
     fprintf(stderr, "HTTP Buffer: %s\n", buf);
-	int readbyte = read_from(sockfd, buf, p, 1024);
+	int readbyte = read_from(sockfd, &buf, p, 1024);
     fprintf(stderr, "HTTP Buffer: %s\n", buf);
 
     // writing buf to file
@@ -133,7 +133,7 @@ ssize_t send_to(int sockfd, char* buf, struct addrinfo* p, size_t count){
 }
 
 
-ssize_t read_from(int sockfd, char* buf, struct addrinfo* p, size_t count){
+ssize_t read_from(int sockfd, char** buffer, struct addrinfo* p, size_t count){
     // char header[1024];
     // ssize_t header_length = recv(sockfd, header, count, 0);
     // header[header_length] = '\0';
@@ -155,6 +155,7 @@ ssize_t read_from(int sockfd, char* buf, struct addrinfo* p, size_t count){
     size_t bytesTotal = 0; // total number of bytes read
     ssize_t bytesRead = 0; // number of bytes read in one single recv()
     size_t buffer_szie = 2048;
+    char* buf = calloc(2048, sizeof(char));
 
     while (1){
         
@@ -178,6 +179,7 @@ ssize_t read_from(int sockfd, char* buf, struct addrinfo* p, size_t count){
     }
     buf[bytesTotal] = '\0';   //TODO: MARK for possible segfault;
     fprintf(stderr, "http::read_from received %zu , Buffer Size %zu\n",bytesTotal, buffer_szie);
+    *buffer = buf;
     return bytesTotal;
 }
 
