@@ -315,7 +315,7 @@ char** parse_http(char* input){
     output[3] = strndup(argument + check_valid + 1, length - check_valid);
     output[4] = NULL;
 
-    // fprintf(stderr, "good: %s, %s, %s, filename: %s\n", output[0], output[1], output[2], output[3]);
+    fprintf(stderr, "good: %s, %s, %s, filename: %s\n", output[0], output[1], output[2], output[3]);
     free(argument);
     return output;
 }
