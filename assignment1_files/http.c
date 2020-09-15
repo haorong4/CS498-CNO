@@ -15,6 +15,7 @@
 #define MAXDATASIZE 100 // max number of bytes we can get at once 
 #define FILE_NOT_FOUND -99
 
+
 size_t CONNECT_STATUS = 0;
 
 void *get_in_addr(struct sockaddr *sa);
