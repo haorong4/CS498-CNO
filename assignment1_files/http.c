@@ -99,7 +99,7 @@ int client (char* hostname, char* port, char* request, char* filename) {
     
     // receiving http response
 	int readbyte = read_from(sockfd, buf, p, 1024);
-    // fprintf(stderr, "HTTP Buffer: %s\n", buf);
+    fprintf(stderr, "HTTP Buffer: %s\n", buf);
 
     // writing buf to file
     write_to_file(filename, buf, readbyte);
