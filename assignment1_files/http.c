@@ -156,8 +156,8 @@ ssize_t read_from(int sockfd, char* buf, struct addrinfo* p, size_t count){
 
     while (1){
         
-        // bytesRead = recv(sockfd, buf + bytesTotal, count, 0);
-        bytesRead = read(sockfd, buf + bytesTotal, count);
+        bytesRead = recv(sockfd, buf + bytesTotal, count, 0);
+        // bytesRead = read(sockfd, buf + bytesTotal, count);
         fprintf(stderr, "bytes Read this turn: %zd", bytesRead);
         if (bytesRead == 0){
             fprintf( stderr, "http::read_from connection closed\n");
