@@ -46,7 +46,7 @@ int main(int argc, char *argv[]){
     }
     char* http_request = create_request (request[0], request[2]);
     //TODO: build http get request from request array.
-    client(request[0], request[1], http_request, request[3]);
+    client(request[0], request[1], http_request, "output");
 
     free(http_request);
     destroy_array(request);
@@ -316,7 +316,7 @@ char** parse_http(char* input){
     output[3] = strndup(argument + check_valid + 1, length - check_valid);
     output[4] = NULL;
 
-    // fprintf(stderr, "good: %s, %s, %s, filename: %s\n", output[0], output[1], output[2], output[3]);
+    fprintf(stderr, "good: %s, %s, %s, filename: %s\n", output[0], output[1], output[2], output[3]);
     free(argument);
     return output;
 }
