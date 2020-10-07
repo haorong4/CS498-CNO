@@ -331,7 +331,6 @@ void free_array_char(char** array ){
     free(temp);
 }
 
-
 char** parse_http(char* input){
     if (strlen(input) < 7){
         fprintf(stderr, "INVALIDPROTOCOL" );
@@ -350,39 +349,38 @@ char** parse_http(char* input){
     }
     free(header);
 
-    size_t length = strlen(argument);
+    ssize_t length = strlen(argument);
     int hostFlag = 1;
     int portFlag = 0;
 
     ssize_t index1 = -1;
     ssize_t index2 = -1;
-    ssize_t check_valid = -2;
     for( size_t i = 0; i < length; i++){
         if ( argument[i] == ':' && (index1 == -1)){
             index1 = i;
         } else if ( argument[i] == '/' && (index2 == -1)){
             index2 = i;
-            check_valid = i;
-        } else if (argument[i] == '/'){
-            if (i == check_valid + 1){
-                check_valid = -2;
-                break;
-            }
-            check_valid = i;
-        }
+        } 
+
     }
 
-    if (index1 >= length || index1 <= 0 || index2 >= length || index2 <= 0 || check_valid < 0) {
+    if ((index1 >= length) || (index2 >= length) || (index2 <= 0) ) {
         fprintf(stderr, "INVALIDPROTOCOL" );
         free(argument);
         return NULL;
     }
 
-    char** output = (char**)calloc(5, sizeof(char*));
-    output[0] = strndup(argument, index1);
-    output[1] = strndup(argument + index1 + 1, index2-index1-1);
-    output[2] = strndup(argument + index2, length - index2);
-    output[3] = strndup(argument + check_valid + 1, length - check_valid);
+    char** output = (char**)calloc(5, sizeof(char*));       
+    if (index1 < 0){
+        output[0] = strndup(argument, index2);
+        output[1] = strdup("3490");
+        output[2] = strndup(argument + index2, length - index2);
+    } else {
+        output[0] = strndup(argument, index1);
+        output[1] = strndup(argument + index1 + 1, index2-index1-1);
+        output[2] = strndup(argument + index2, length - index2);
+    }
+    output[3] = strdup("output");
     output[4] = NULL;
 
     fprintf(stderr, "good: %s, %s, %s, filename: %s\n", output[0], output[1], output[2], output[3]);
