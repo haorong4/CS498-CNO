@@ -3,6 +3,7 @@
 #include <pthread.h>
 
 #include "monitor_neighbors.h"
+#include "utils.h"
 
 
 void listenForNeighbors();

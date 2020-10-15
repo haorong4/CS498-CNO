@@ -11,6 +11,20 @@
 #include <netdb.h>
 #include <pthread.h>
 
+#include "util.h"
+
+#define SEND 1
+#define COST 2
+#define NEWS 3
+#define TOPOFILE "test_topo.txt"
+
+typedef struct _msg_pack {
+   char msg[1024];
+   int length;
+   int dest;
+   struct _msg_channel *next;
+} msg_pack;
+
 extern int globalMyID;
 //last time you heard from each node. TODO: you will want to monitor this
 //in order to realize when a neighbor has gotten cut off from you.
@@ -21,28 +35,80 @@ extern int globalSocketUDP;
 //pre-filled for sending to 10.1.1.0 - 255, port 7777
 extern struct sockaddr_in globalNodeAddrs[256];
 
+extern int globalNodeNeighbor[256][256];
+
+//TODO: add a lock to it;
+msg_pack *channel = NULL;
+msg_pack *channel_tail = NULL;
+
+suseconds_t dropTime = 700 * 1000 * 1000;  //700 ms 
+
+// path message format: path:dest:p-p-p-p:cost
+
 
 //Yes, this is terrible. It's also terrible that, in Linux, a socket
 //can't receive broadcast packets unless it's bound to INADDR_ANY,
 //which we can't do in this assignment.
-void hackyBroadcast(const char* buf, int length)
+void broadcast(const char* buf, int length)
 {
 	int i;
 	for(i=0;i<256;i++)
-		if(i != globalMyID) //(although with a real broadcast you would also get the packet yourself)
+		if(i != globalMyID && globalNodeNeighbor[globalMyID][i]) //(although with a real broadcast you would also get the packet yourself)
 			sendto(globalSocketUDP, buf, length, 0,
 				  (struct sockaddr*)&globalNodeAddrs[i], sizeof(globalNodeAddrs[i]));
 }
 
+void send_pack(const char* buf, int length, int i)
+{
+	if(i != globalMyID && globalNodeNeighbor[globalMyID][i]) //(although with a real broadcast you would also get the packet yourself)
+		sendto(globalSocketUDP, buf, length, 0,
+			(struct sockaddr*)&globalNodeAddrs[i], sizeof(globalNodeAddrs[i]));
+}
+
 void* announceToNeighbors(void* unusedParam)
 {
-	struct timespec sleepFor;
-	sleepFor.tv_sec = 0;
-	sleepFor.tv_nsec = 300 * 1000 * 1000; //300 ms
+	struct timespec sleepLong;
+	sleepLong.tv_sec = 0;
+	sleepLong.tv_nsec = 300 * 1000 * 1000; //300 ms
+
+	struct timespec sleepShort;
+	sleepShort.tv_sec = 0;
+	sleepShort.tv_nsec = 100 * 1000 * 1000; //300 ms
 	while(1)
 	{
-		hackyBroadcast("HEREIAM", 7);
-		nanosleep(&sleepFor, 0);
+		if (channel == NULL){
+			broadcast("HEREIAM", 7);
+			nanosleep(&sleepLong, 0);
+		} else {
+			msg_pack* pack = channel;
+			channel = pack -> next;
+			if (pack -> dest != -1){
+				send_pack(pack -> msg, pack -> length, pack -> dest);
+			} else {
+				broadcast(pack -> msg, pack -> length);
+				nanosleep(&sleepShort, 0);
+			}
+		}
+	}
+}
+
+suseconds_t time_diff(struct timeval time1, struct timeval time2){
+	suseconds_t a = (time1.tv_sec - time2.tv_sec) * 1000;
+	a += (time1.tv_usec - time2.tv_usec);
+	return a;
+}
+
+int check_neighbor(){
+	struct timeval cur_time;
+	for(int i = 0; i < 256; i++){
+		if(globalNodeNeighbor[globalMyID][i]){
+			gettimeofday(&cur_time, 0);
+			if (time_diff(cur_time, globalLastHeartbeat[i]) > dropTime){
+				//TODO: report failure;
+				removeNeighbor(i);
+
+			}
+		}
 	}
 }
 
@@ -82,17 +148,36 @@ void listenForNeighbors()
 		//send format: 'send'<4 ASCII bytes>, destID<net order 2 byte signed>, <some ASCII message>
 		
 		//TODO: use break message here on recvBuf;
-		if(!strncmp(recvBuf, "send", 4))
+		uint16_t task_ID;
+		char* task_content;
+
+		int mission = breakMessage(recvBuf, &task_ID, &task_content);
+		if(mission == SEND)
 		{
-			//TODO send the requested message to the requested destination node
+			//TODO: send the requested message to the requested destination node
 			// ...
 		}
 		//'cost'<4 ASCII bytes>, destID<net order 2 byte signed> newCost<net order 4 byte signed>
-		else if(!strncmp(recvBuf, "cost", 4))
+		else if(mission == COST)
 		{
-			//TODO record the cost change (remember, the link might currently be down! in that case,
+			//TODO: record the cost change (remember, the link might currently be down! in that case,
 			//this is the new cost you should treat it as having once it comes back up.)
 			// ...
+		}
+
+		else if(mission == NEWS)
+		{
+			//TODO: record the cost change (remember, the link might currently be down! in that case,
+			//this is the new cost you should treat it as having once it comes back up.)
+			// ...
+		}
+
+		else if(!strncmp(recvBuf, "pack", 4))
+		{
+			
+		}
+		else {
+			check_neighbor();
 		}
 		
 		//TODO now check for the various types of packets you use in your own protocol
@@ -102,4 +187,7 @@ void listenForNeighbors()
 	//(should never reach here)
 	close(globalSocketUDP);
 }
+
+
+
 
