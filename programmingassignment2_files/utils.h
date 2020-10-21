@@ -12,7 +12,7 @@
 #define LOGFILE "log"
 #define TOPOFILE "test_topo.txt"
 
-extern int globalMyID = 0;
+extern int globalMyID;
 extern int globalNodeCost[256];
 extern int globalNodeNeighbor[256][256];
 
@@ -26,31 +26,6 @@ void log_receive (char* message);
 char** split(char* input, char delimiter);
 
 
-void initCost(char* costFile){
-    for (int i = 0; i < 256; i++){
-        globalNodeCost[i] = 1;
-    }
-
-    FILE *fp;
-    fp = fopen(costFile, "r+");
-
-    int bytes_read;
-    size_t nbytes = 100;
-    char *my_string = NULL;
-    // my_string = (char *) malloc (nbytes + 1);
-    while ( (bytes_read = getline (&my_string, &nbytes, fp)) != -1) {
-        my_string[bytes_read-1] = '\0';
-        int ID;
-        int cost;
-
-        sscanf(my_string, "%d %d", &ID, &cost);
-        globalNodeCost[ID] = cost;
-    }
-    if (my_string != NULL){
-        free(my_string);
-    }
-    fclose(fp);
-}
 
 int breakMessage(char* message, uint16_t* ID, char** task){
     if (strncmp(message, "news", 4) == 0){
@@ -135,6 +110,24 @@ char** split(char* input, char delimiter) {
 
     free(temp);
     return output;
+}
+
+
+void destroyC(char** array){
+    char** temp = array;
+    while(*array != NULL){
+        free(*array);
+        array += 1;
+    }
+    free(temp);
+}
+
+int lenC(char** arr){
+   int count = 0;
+   while(arr != NULL && arr[count] != NULL){
+      count++;
+   }
+   return count;
 }
 
 

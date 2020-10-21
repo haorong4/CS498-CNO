@@ -3,7 +3,7 @@
 #include <pthread.h>
 
 #include "monitor_neighbors.h"
-#include "utils.h"
+// #include "utils.h"
 
 
 void listenForNeighbors();
@@ -19,6 +19,9 @@ struct timeval globalLastHeartbeat[256];
 int globalSocketUDP;
 //pre-filled for sending to 10.1.1.0 - 255, port 7777
 struct sockaddr_in globalNodeAddrs[256];
+
+int globalNodeNeighbor[256][256];
+int timestamps[256];
 
  
 int main(int argc, char** argv)
@@ -70,6 +73,9 @@ int main(int argc, char** argv)
 		exit(1);
 	}
 	
+
+	initNeighbor();
+	init_forward_table();
 	
 	//start threads... feel free to add your own, and to remove the provided ones.
 	pthread_t announcerThread;

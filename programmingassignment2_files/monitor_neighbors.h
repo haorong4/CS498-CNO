@@ -11,7 +11,7 @@
 #include <netdb.h>
 #include <pthread.h>
 
-#include "util.h"
+#include "map.h"
 
 #define SEND 1
 #define COST 2
@@ -22,7 +22,7 @@ typedef struct _msg_pack {
    char msg[1024];
    int length;
    int dest;
-   struct _msg_channel *next;
+   struct _msg_pack *next;
 } msg_pack;
 
 extern int globalMyID;
@@ -37,13 +37,43 @@ extern struct sockaddr_in globalNodeAddrs[256];
 
 extern int globalNodeNeighbor[256][256];
 
+
 //TODO: add a lock to it;
+pthread_mutex_t duck = PTHREAD_MUTEX_INITIALIZER;
 msg_pack *channel = NULL;
 msg_pack *channel_tail = NULL;
 
 suseconds_t dropTime = 700 * 1000 * 1000;  //700 ms 
 
-// path message format: path:dest:p-p-p-p:cost
+void pushMsgChannel(char* content, int dest){
+	msg_pack* pack = calloc(1, sizeof(msg_pack));
+	strcpy(pack->msg, content);
+	pack -> dest = dest;
+	pack -> length = strlen(content);
+	pack -> next = NULL;
+	pthread_mutex_lock(&duck);
+	if (channel == NULL){
+		channel = pack;
+		channel_tail = pack;
+	} else {
+		channel_tail -> next = pack;
+		channel_tail = pack;
+	}
+	pthread_mutex_unlock(&duck);
+	return;
+}
+
+msg_pack* pullMsgChannel(){
+	msg_pack* pack = NULL;
+	pthread_mutex_lock(&duck);
+	if (channel != NULL){
+		pack = channel;
+		channel = channel -> next;
+	}
+	pthread_mutex_unlock(&duck);
+	return pack;
+}
+
 
 
 //Yes, this is terrible. It's also terrible that, in Linux, a socket
@@ -73,21 +103,25 @@ void* announceToNeighbors(void* unusedParam)
 
 	struct timespec sleepShort;
 	sleepShort.tv_sec = 0;
-	sleepShort.tv_nsec = 100 * 1000 * 1000; //300 ms
+	sleepShort.tv_nsec = 100 * 1000 * 1000; //100 ms
 	while(1)
 	{
-		if (channel == NULL){
-			broadcast("HEREIAM", 7);
+		msg_pack* pack = pullMsgChannel();
+		if (pack == NULL){
+			char* msg = LinkMsg();
+			if (msg == NULL){
+				msg = "HEREIAM";
+			}
+			broadcast(msg, strlen(msg));
 			nanosleep(&sleepLong, 0);
 		} else {
-			msg_pack* pack = channel;
-			channel = pack -> next;
 			if (pack -> dest != -1){
 				send_pack(pack -> msg, pack -> length, pack -> dest);
 			} else {
 				broadcast(pack -> msg, pack -> length);
 				nanosleep(&sleepShort, 0);
 			}
+			free(pack);
 		}
 	}
 }
@@ -105,11 +139,11 @@ int check_neighbor(){
 			gettimeofday(&cur_time, 0);
 			if (time_diff(cur_time, globalLastHeartbeat[i]) > dropTime){
 				//TODO: report failure;
-				removeNeighbor(i);
-
+				dropLink(i);
 			}
 		}
 	}
+	return 0;
 }
 
 void listenForNeighbors()
@@ -138,8 +172,10 @@ void listenForNeighbors()
 			heardFrom = atoi(
 					strchr(strchr(strchr(fromAddr,'.')+1,'.')+1,'.')+1);
 			
-			//TODO: this node can consider heardFrom to be directly connected to it; do any such logic now.
-			
+			//TODO: this is not very needed, remove it if nothing happens wrong.
+			if (linkCost(globalMyID, heardFrom) <= 0){
+				addLink(heardFrom, 1);
+			}
 			//record that we heard from heardFrom just now.
 			gettimeofday(&globalLastHeartbeat[heardFrom], 0);
 		}
@@ -156,6 +192,13 @@ void listenForNeighbors()
 		{
 			//TODO: send the requested message to the requested destination node
 			// ...
+			if (task_ID == globalMyID){
+				log_receive(task_content);
+				continue;
+			}
+			int dest = forward_ID(task_ID);
+			pushMsgChannel(recvBuf, dest);
+
 		}
 		//'cost'<4 ASCII bytes>, destID<net order 2 byte signed> newCost<net order 4 byte signed>
 		else if(mission == COST)
@@ -172,9 +215,9 @@ void listenForNeighbors()
 			// ...
 		}
 
-		else if(!strncmp(recvBuf, "pack", 4))
+		else if(!strncmp(recvBuf, "link", 4))
 		{
-			
+			updateLinkFromMsg(recvBuf);
 		}
 		else {
 			check_neighbor();

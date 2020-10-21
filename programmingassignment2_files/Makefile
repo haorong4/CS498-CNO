@@ -1,10 +1,12 @@
-all: vec ls
+all: ls
 
 vec: main.c monitor_neighbors.h
 	gcc -pthread -o vec_router main.c monitor_neighbors.h
 
-ls: main.c monitor_neighbors.h
-	gcc -pthread -o ls_router main.c monitor_neighbors.h
+ls: main.c monitor_neighbors.h 
+	gcc -pthread -o ls_router main.c 
+	#monitor_neighbors.h path.h map.h utils.h
+	# monitor_neighbors.h path.h map.h utils.h
 
 .PHONY: clean
 clean:
