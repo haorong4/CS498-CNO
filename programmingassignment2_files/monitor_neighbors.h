@@ -45,7 +45,7 @@ pthread_mutex_t duck = PTHREAD_MUTEX_INITIALIZER;
 msg_pack *channel = NULL;
 msg_pack *channel_tail = NULL;
 
-suseconds_t dropTime = 700 * 1000 * 1000;  //700 ms 
+suseconds_t dropTime = 1000 * 1000 * 1000;  //700 ms 
 
 void pushMsgChannel(char* content, int dest){
 	msg_pack* pack = calloc(1, sizeof(msg_pack));
@@ -81,14 +81,14 @@ void broadcast(const char* buf, int length)
 {
 	int i;
 	for(i=0;i<256;i++)
-		if(i != globalMyID && globalNodeNeighbor[globalMyID][i]) //(although with a real broadcast you would also get the packet yourself)
+		if(i != globalMyID) //(although with a real broadcast you would also get the packet yourself)
 			sendto(globalSocketUDP, buf, length, 0,
 				  (struct sockaddr*)&globalNodeAddrs[i], sizeof(globalNodeAddrs[i]));
 }
 
 void send_pack(const char* buf, int length, int i)
 {
-	if(i != globalMyID && globalNodeNeighbor[globalMyID][i]) //(although with a real broadcast you would also get the packet yourself)
+	if(i != globalMyID ) //(although with a real broadcast you would also get the packet yourself)
 		sendto(globalSocketUDP, buf, length, 0,
 			(struct sockaddr*)&globalNodeAddrs[i], sizeof(globalNodeAddrs[i]));
 }
@@ -106,7 +106,8 @@ int check_neighbor(){
 			gettimeofday(&cur_time, 0);
 			if (time_diff(cur_time, globalLastHeartbeat[i]) > dropTime){
 				// TODO: report failure;
-				dropLink(i);
+				fprintf(stderr, "Fail to connected with %d", i);
+				// dropLink(i);
 			}
 		}
 	}
