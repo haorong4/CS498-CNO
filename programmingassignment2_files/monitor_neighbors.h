@@ -26,6 +26,8 @@ typedef struct _msg_pack {
 } msg_pack;
 
 extern int globalMyID;
+extern char* logFile;
+extern char* costFile;
 //last time you heard from each node. TODO: you will want to monitor this
 //in order to realize when a neighbor has gotten cut off from you.
 extern struct timeval globalLastHeartbeat[256];
@@ -75,10 +77,6 @@ msg_pack* pullMsgChannel(){
 }
 
 
-
-//Yes, this is terrible. It's also terrible that, in Linux, a socket
-//can't receive broadcast packets unless it's bound to INADDR_ANY,
-//which we can't do in this assignment.
 void broadcast(const char* buf, int length)
 {
 	int i;
@@ -93,6 +91,26 @@ void send_pack(const char* buf, int length, int i)
 	if(i != globalMyID && globalNodeNeighbor[globalMyID][i]) //(although with a real broadcast you would also get the packet yourself)
 		sendto(globalSocketUDP, buf, length, 0,
 			(struct sockaddr*)&globalNodeAddrs[i], sizeof(globalNodeAddrs[i]));
+}
+
+suseconds_t time_diff(struct timeval time1, struct timeval time2){
+	suseconds_t a = (time1.tv_sec - time2.tv_sec) * 1000;
+	a += (time1.tv_usec - time2.tv_usec);
+	return a;
+}
+
+int check_neighbor(){
+	struct timeval cur_time;
+	for(int i = 0; i < 256; i++){
+		if(globalNodeNeighbor[globalMyID][i]){
+			gettimeofday(&cur_time, 0);
+			if (time_diff(cur_time, globalLastHeartbeat[i]) > dropTime){
+				// TODO: report failure;
+				dropLink(i);
+			}
+		}
+	}
+	return 0;
 }
 
 void* announceToNeighbors(void* unusedParam)
@@ -123,28 +141,10 @@ void* announceToNeighbors(void* unusedParam)
 			}
 			free(pack);
 		}
+		check_neighbor();
 	}
 }
 
-suseconds_t time_diff(struct timeval time1, struct timeval time2){
-	suseconds_t a = (time1.tv_sec - time2.tv_sec) * 1000;
-	a += (time1.tv_usec - time2.tv_usec);
-	return a;
-}
-
-int check_neighbor(){
-	struct timeval cur_time;
-	for(int i = 0; i < 256; i++){
-		if(globalNodeNeighbor[globalMyID][i]){
-			gettimeofday(&cur_time, 0);
-			if (time_diff(cur_time, globalLastHeartbeat[i]) > dropTime){
-				//TODO: report failure;
-				dropLink(i);
-			}
-		}
-	}
-	return 0;
-}
 
 void listenForNeighbors()
 {
@@ -180,9 +180,6 @@ void listenForNeighbors()
 			gettimeofday(&globalLastHeartbeat[heardFrom], 0);
 		}
 		
-		//Is it a packet from the manager? (see mp2 specification for more details)
-		//send format: 'send'<4 ASCII bytes>, destID<net order 2 byte signed>, <some ASCII message>
-		
 		//TODO: use break message here on recvBuf;
 		uint16_t task_ID;
 		char* task_content;
@@ -190,15 +187,26 @@ void listenForNeighbors()
 		int mission = breakMessage(recvBuf, &task_ID, &task_content);
 		if(mission == SEND)
 		{
-			//TODO: send the requested message to the requested destination node
-			// ...
 			if (task_ID == globalMyID){
 				log_receive(task_content);
 				continue;
 			}
 			int dest = forward_ID(task_ID);
+			if (dest == NONE){
+				log_unreachable(task_ID);
+				continue;
+			}
 			pushMsgChannel(recvBuf, dest);
+			if (heardFrom != -1) {
+				log_forward(task_ID, dest, task_content);
+			} else {
+				log_send(task_ID, dest, task_content);
+			}
 
+		}
+		else if(!strncmp(recvBuf, "link", 4))
+		{
+			updateLinkFromMsg(recvBuf);
 		}
 		//'cost'<4 ASCII bytes>, destID<net order 2 byte signed> newCost<net order 4 byte signed>
 		else if(mission == COST)
@@ -207,27 +215,8 @@ void listenForNeighbors()
 			//this is the new cost you should treat it as having once it comes back up.)
 			// ...
 		}
-
-		else if(mission == NEWS)
-		{
-			//TODO: record the cost change (remember, the link might currently be down! in that case,
-			//this is the new cost you should treat it as having once it comes back up.)
-			// ...
-		}
-
-		else if(!strncmp(recvBuf, "link", 4))
-		{
-			updateLinkFromMsg(recvBuf);
-		}
-		else {
-			check_neighbor();
-		}
-		
-		//TODO now check for the various types of packets you use in your own protocol
-		//else if(!strncmp(recvBuf, "your other message types", ))
-		// ... 
+		free(task_content);
 	}
-	//(should never reach here)
 	close(globalSocketUDP);
 }
 

@@ -16,12 +16,15 @@ extern int globalMyID;
 extern int globalNodeCost[256];
 extern int globalNodeNeighbor[256][256];
 
+extern char* logFile;
+extern char* costFile;
+
 
 int breakMessage(char* message, uint16_t* ID, char** task);
 void initCost(char* costFile);
 void log_unreachable (uint16_t ID);
 void log_send (uint16_t dest, uint16_t next, char* message);
-void log_forward (uint16_t dest, uint16_t next, char* message);
+void log_forward (int dest, int next, char* message);
 void log_receive (char* message);
 char** split(char* input, char delimiter);
 
@@ -56,7 +59,7 @@ int breakMessage(char* message, uint16_t* ID, char** task){
 void log_unreachable (uint16_t ID){
    FILE *fp;
 
-   fp = fopen(LOGFILE, "a+");
+   fp = fopen(logFile, "a+");
    fprintf(fp, "unreachable dest %d\n", ID);
    fclose(fp);
 }
@@ -64,15 +67,15 @@ void log_unreachable (uint16_t ID){
 void log_send (uint16_t dest, uint16_t next, char* message){
    FILE *fp;
 
-   fp = fopen(LOGFILE, "a+");
+   fp = fopen(logFile, "a+");
    fprintf(fp, "sending packet dest %d nexthop %d message %s\n", dest, next, message);
    fclose(fp);
 }
 
-void log_forward (uint16_t dest, uint16_t next, char* message){
+void log_forward (int dest, int next, char* message){
    FILE *fp;
 
-   fp = fopen(LOGFILE, "a+");
+   fp = fopen(logFile, "a+");
    fprintf(fp, "forward packet dest %d nexthop %d message %s\n", dest, next, message);
    fclose(fp);
 }
@@ -80,7 +83,7 @@ void log_forward (uint16_t dest, uint16_t next, char* message){
 void log_receive (char* message){
    FILE *fp;
 
-   fp = fopen(LOGFILE, "a+");
+   fp = fopen(logFile, "a+");
    fprintf(fp, "receive packet message %s\n", message);
    fclose(fp);
 }

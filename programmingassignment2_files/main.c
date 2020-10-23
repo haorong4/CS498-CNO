@@ -10,7 +10,10 @@ void listenForNeighbors();
 void* announceToNeighbors(void* unusedParam);
 
 
+
 int globalMyID = 0;
+char* logFile;
+char* costFile;
 //last time you heard from each node. TODO: you will want to monitor this
 //in order to realize when a neighbor has gotten cut off from you.
 struct timeval globalLastHeartbeat[256];
@@ -35,6 +38,8 @@ int main(int argc, char** argv)
 	
 	//initialization: get this process's node ID, record what time it is, 
 	//and set up our sockaddr_in's for sending to the other nodes.
+	costFile = strdup(argv[2]);
+	logFile = strdup(argv[3]);
 	globalMyID = atoi(argv[1]);
 	int i;
 	for(i=0;i<256;i++)
