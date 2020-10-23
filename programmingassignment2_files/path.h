@@ -20,6 +20,8 @@ extern int globalMyID;
 extern int globalNodeCost[256];
 extern int globalNodeNeighbor[256][256];
 
+extern char* logFile;
+extern char* costFile;
 static int forward_table[256];
 
 int lenC(char** arr);
