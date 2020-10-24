@@ -117,7 +117,7 @@ int dijkstra(int src) {
                 (i != src) && 
                 ((i == globalMyID && globalNodeNeighbor[globalMyID][src] == real_cost)|| globalNodeNeighbor[globalMyID][i])){
 
-            min = dist[i];
+            min = real_cost;
             index = i;
             // fprintf(stderr, "found new min, %d, with cost: %d", index, min);
         } 
