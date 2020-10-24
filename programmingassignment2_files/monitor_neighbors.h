@@ -217,11 +217,13 @@ void listenForNeighbors()
 			} else {
 				log_send(task_ID, dest, task_content);
 			}
+			log_matrix(1);
+			log_matrix(4);
 
 		}
 		else if(mission == NEWS)
 		{
-			log_test(task_content);
+			// log_test(task_content);
 			if (updateLinkFromMsg(task_content)){
 				pushMsgChannel(recvBuf, -1, bytesRecvd);
 			}

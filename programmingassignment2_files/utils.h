@@ -11,6 +11,7 @@
 
 #define LOGFILE "log"
 #define TOPOFILE "test_topo.txt"
+#define TARGET 1
 
 extern int globalMyID;
 extern int globalNodeCost[256];
@@ -89,12 +90,27 @@ void log_receive (char* message){
 }
 
 void log_test (char* message){
-   if(globalMyID != 1){
+   if(globalMyID != TARGET){
      return;
    }
    FILE *fp;
    fp = fopen(logFile, "a+");
    fprintf(fp, "log message %s\n", message);
+   fclose(fp);
+}
+
+void log_matrix (int ID){
+   if(globalMyID != TARGET){
+     return;
+   }
+   FILE *fp;
+   fp = fopen(logFile, "a+");
+   for (int i = 0; i < 256; i++){
+     char temp[20];
+     sprintf(temp, " -%d:%d- ", i, globalNodeNeighbor[ID][i]);
+     fprintf(fp, "%s", temp);
+   }
+   fprintf(fp, "%s\n", "");
    fclose(fp);
 }
 
