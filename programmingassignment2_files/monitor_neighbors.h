@@ -107,8 +107,8 @@ int check_neighbor(){
 			gettimeofday(&cur_time, 0);
 			if (time_diff(cur_time, globalLastHeartbeat[i]) > dropTime){
 				// TODO: report failure;
-				fprintf(stderr, "Fail to connected with %d", i);
-				// dropLink(i);
+				// fprintf(stderr, "Fail to connected with %d", i);
+				dropLink(i);
 			}
 		}
 	}
@@ -119,15 +119,21 @@ void* announceToNeighbors(void* unusedParam)
 {
 	struct timespec sleepLong;
 	sleepLong.tv_sec = 0;
-	sleepLong.tv_nsec = 300 * 1000 * 1000; //300 ms
+	sleepLong.tv_nsec = 150 * 1000 * 1000; //300 ms
 
 	struct timespec sleepShort;
 	sleepShort.tv_sec = 0;
 	sleepShort.tv_nsec = 100 * 1000 * 1000; //100 ms
+	int count = 0; 
 	while(1)
 	{
 		msg_pack* pack = pullMsgChannel();
 		if (pack == NULL){
+			count++;
+			if(count % 2 == 0){
+				count = 0;
+				continue;
+			}
 			pthread_mutex_lock(&linkMsgLock);
 			char* msg = LinkMsg();
 			if (msg == NULL){
@@ -144,7 +150,7 @@ void* announceToNeighbors(void* unusedParam)
 				send_pack(pack -> msg, pack -> length, pack -> dest);
 			} else {
 				broadcast(pack -> msg, pack -> length);
-				nanosleep(&sleepShort, 0);
+				// nanosleep(&sleepShort, 0);
 			}
 			free(pack);
 		}
