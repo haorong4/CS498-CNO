@@ -93,7 +93,6 @@ void log_test (char* message){
      return;
    }
    FILE *fp;
-
    fp = fopen(logFile, "a+");
    fprintf(fp, "log message %s\n", message);
    fclose(fp);
