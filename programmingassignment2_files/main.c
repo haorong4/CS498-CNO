@@ -41,6 +41,10 @@ int main(int argc, char** argv)
 	costFile = strdup(argv[2]);
 	logFile = strdup(argv[3]);
 	globalMyID = atoi(argv[1]);
+
+	FILE* fp = fopen(logFile, "w");
+	fclose(fp);
+
 	int i;
 	for(i=0;i<256;i++)
 	{
