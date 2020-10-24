@@ -42,16 +42,17 @@ extern int globalNodeNeighbor[256][256];
 
 //TODO: add a lock to it;
 pthread_mutex_t duck = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t linkMsgLock = PTHREAD_MUTEX_INITIALIZER;
 msg_pack *channel = NULL;
 msg_pack *channel_tail = NULL;
 
 suseconds_t dropTime = 1000 * 1000 * 1000;  //700 ms 
 
-void pushMsgChannel(char* content, int dest){
+void pushMsgChannel(char* content, int dest, int length){
 	msg_pack* pack = calloc(1, sizeof(msg_pack));
-	strcpy(pack->msg, content);
+	memcpy(pack->msg, content, length);
 	pack -> dest = dest;
-	pack -> length = strlen(content);
+	pack -> length = length;
 	pack -> next = NULL;
 	pthread_mutex_lock(&duck);
 	if (channel == NULL){
@@ -127,11 +128,16 @@ void* announceToNeighbors(void* unusedParam)
 	{
 		msg_pack* pack = pullMsgChannel();
 		if (pack == NULL){
+			pthread_mutex_lock(&linkMsgLock);
 			char* msg = LinkMsg();
 			if (msg == NULL){
 				msg = "HEREIAM";
 			}
+			msg = strdup(msg);
+			pthread_mutex_unlock(&linkMsgLock);
+			
 			broadcast(msg, strlen(msg));
+			free(msg);
 			nanosleep(&sleepLong, 0);
 		} else {
 			if (pack -> dest != -1){
@@ -164,7 +170,7 @@ void listenForNeighbors()
 			perror("connectivity listener: recvfrom failed");
 			exit(1);
 		}
-		
+		recvBuf[bytesRecvd] = '\0';
 		inet_ntop(AF_INET, &theirAddr.sin_addr, fromAddr, 100);
 		
 		short int heardFrom = -1;
@@ -180,24 +186,32 @@ void listenForNeighbors()
 			//record that we heard from heardFrom just now.
 			gettimeofday(&globalLastHeartbeat[heardFrom], 0);
 		}
+		// log_test("receive message from someone, starting to break message");
 		
 		//TODO: use break message here on recvBuf;
 		uint16_t task_ID;
 		char* task_content;
+		char* recvCopy = (char*) calloc(1, bytesRecvd*sizeof(char)+5);
+		memcpy(recvCopy, recvBuf, bytesRecvd);
 
-		int mission = breakMessage(recvBuf, &task_ID, &task_content);
+		int mission = breakMessage(recvCopy, &task_ID, &task_content);
 		if(mission == SEND)
 		{
 			if (task_ID == globalMyID){
 				log_receive(task_content);
+				free(task_content);
+				free(recvCopy);
 				continue;
 			}
 			int dest = forward_ID(task_ID);
+
 			if (dest == NONE){
 				log_unreachable(task_ID);
+				free(task_content);
+				free(recvCopy);
 				continue;
 			}
-			pushMsgChannel(recvBuf, dest);
+			pushMsgChannel(recvBuf, dest, bytesRecvd);
 			if (heardFrom != -1) {
 				log_forward(task_ID, dest, task_content);
 			} else {
@@ -205,9 +219,13 @@ void listenForNeighbors()
 			}
 
 		}
-		else if(!strncmp(recvBuf, "link", 4))
+		else if(mission == NEWS)
 		{
-			updateLinkFromMsg(recvBuf);
+			log_test(task_content);
+			if (updateLinkFromMsg(task_content)){
+				pushMsgChannel(recvBuf, -1, bytesRecvd);
+			}
+
 		}
 		//'cost'<4 ASCII bytes>, destID<net order 2 byte signed> newCost<net order 4 byte signed>
 		else if(mission == COST)
@@ -217,6 +235,7 @@ void listenForNeighbors()
 			// ...
 		}
 		free(task_content);
+		free(recvCopy);
 	}
 	close(globalSocketUDP);
 }

@@ -23,8 +23,10 @@ extern char* logFile;
 extern char* costFile;
 extern int globalNodeNeighbor[256][256];
 extern int timestamps[256];
+extern pthread_mutex_t linkMsgLock;
 
 char* linkMsg = NULL;
+
 
 int linkCost(int a, int b){
     return globalNodeNeighbor[a][b];
@@ -40,22 +42,27 @@ void buildLinkMsg(){
         if (cost == 0){
             continue;
         }
-        char temp[20];
+        char temp[30];
         temp[0] = '\0';
-        if (i == 255){
-            sprintf(temp, "%d-%d", i, cost);
-        } else {
-            sprintf(temp, "%d-%d,", i, cost);
-        }
+        // if (i == 255){
+        //     sprintf(temp, "%d-%d", i, cost);
+        // } else {
+        //     sprintf(temp, "%d-%d,", i, cost);
+        // }
+        sprintf(temp, "%d-%d,", i, cost);
+        log_test(temp);
         strcat(buf, temp);
-    }
-    if (linkMsg != NULL){
-        free(linkMsg);
     }
     if (buf[strlen(buf)-1] == ','){
         buf[strlen(buf)-1] = '\0';
     }
+    strcat(buf, ";");
+    pthread_mutex_lock(&linkMsgLock);
+    if (linkMsg != NULL){
+        free(linkMsg);
+    }
     linkMsg = strdup(buf);
+    pthread_mutex_unlock(&linkMsgLock);
 }
 
 void printLinkMsg(){
@@ -85,12 +92,13 @@ void addLink(int dest, int cost){
 
 
 //link:ID:timestamp:p-cost,p-cost,p-cost... 
-void updateLinkFromMsg(char* message){
+int updateLinkFromMsg(char* message){
     int ts, src;
     char buf[1024];
-    sscanf(message, "link:%d:%d:%s", &src, &ts, buf);
-    if (ts <= timestamps[src]){
-        return;
+    buf[0] = '\0';
+    sscanf(message, "link:%d:%d:%s;", &src, &ts, buf);
+    if (ts <= timestamps[src] || strlen(buf) <= 1){
+        return 0;
     }
     int dirty = linkCost(globalMyID, src);
     timestamps[src] = ts;
@@ -110,6 +118,7 @@ void updateLinkFromMsg(char* message){
     } 
     init_forward_table();//flush forward table
     destroyC(links);
+    return 1;
 }
 
 void initCost(char* _costFile){
@@ -127,9 +136,9 @@ void initCost(char* _costFile){
         int cost;
 
         sscanf(my_string, "%d %d", &ID, &cost);
-        if (linkCost(globalMyID, ID) != 0){
-            updateLink(globalMyID, ID, cost);
-        }
+        // if (linkCost(globalMyID, ID) != 0){
+        updateLink(globalMyID, ID, cost);
+        // }
     }
     if (my_string != NULL){
         free(my_string);

@@ -31,8 +31,8 @@ char** split(char* input, char delimiter);
 
 
 int breakMessage(char* message, uint16_t* ID, char** task){
-    if (strncmp(message, "news", 4) == 0){
-        *task = strdup(message+4);
+    if (strncmp(message, "link", 4) == 0){
+        *task = strdup(message);
         return 3;
     }
     *task = strdup(message+6);
@@ -86,6 +86,14 @@ void log_receive (char* message){
    fp = fopen(logFile, "a+");
    fprintf(fp, "receive packet message %s\n", message);
    fclose(fp);
+}
+
+void log_test (char* message){
+  //  FILE *fp;
+
+  //  fp = fopen(logFile, "a+");
+  //  fprintf(fp, "log message %s\n", message);
+  //  fclose(fp);
 }
 
 
