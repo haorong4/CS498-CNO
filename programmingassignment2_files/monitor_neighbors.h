@@ -180,7 +180,7 @@ void listenForNeighbors()
 					strchr(strchr(strchr(fromAddr,'.')+1,'.')+1,'.')+1);
 			
 			//TODO: this is not very needed, remove it if nothing happens wrong.
-			if (linkCost(globalMyID, heardFrom) <= 0){
+			if (linkCost(globalMyID, heardFrom) < 1){
 				addLink(heardFrom, 1);
 			}
 			//record that we heard from heardFrom just now.

@@ -89,11 +89,14 @@ void log_receive (char* message){
 }
 
 void log_test (char* message){
-  //  FILE *fp;
+   if(globalMyID != 1){
+     return;
+   }
+   FILE *fp;
 
-  //  fp = fopen(logFile, "a+");
-  //  fprintf(fp, "log message %s\n", message);
-  //  fclose(fp);
+   fp = fopen(logFile, "a+");
+   fprintf(fp, "log message %s\n", message);
+   fclose(fp);
 }
 
 
