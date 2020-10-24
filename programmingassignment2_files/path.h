@@ -110,13 +110,16 @@ int dijkstra(int src) {
     int min = INT_MAX;
     int index = NONE;
     for (int i = 0; i < 256; i++) {
-        if     (((dist[i] < min) || (dist[i] == min && i < index)) &&
+        int real_cost = dist[i] + globalNodeNeighbor[globalMyID][i];
+
+        if     (((real_cost < min) || (real_cost == min && i < index)) &&
                 (dist[i] != INT_MAX) && 
                 (i != src) && 
-                (i == globalMyID || globalNodeNeighbor[globalMyID][i])){
+                ((i == globalMyID && globalNodeNeighbor[globalMyID][src] == real_cost)|| globalNodeNeighbor[globalMyID][i])){
 
             min = dist[i];
             index = i;
+            // fprintf(stderr, "found new min, %d, with cost: %d", index, min);
         } 
     }
     //this means that destination is a neighbor.
