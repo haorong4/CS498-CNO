@@ -43,10 +43,11 @@ extern int globalNodeNeighbor[256][256];
 //TODO: add a lock to it;
 pthread_mutex_t duck = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t linkMsgLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t sendToLock = PTHREAD_MUTEX_INITIALIZER;
 msg_pack *channel = NULL;
 msg_pack *channel_tail = NULL;
 
-suseconds_t dropTime = 1000 * 1000 * 1000;  //700 ms 
+suseconds_t dropTime = 500 * 1000 * 1000;  //700 ms 
 
 void pushMsgChannel(char* content, int dest, int length){
 	msg_pack* pack = calloc(1, sizeof(msg_pack));
@@ -81,17 +82,21 @@ msg_pack* pullMsgChannel(){
 void broadcast(const char* buf, int length)
 {
 	int i;
+	pthread_mutex_lock(&sendToLock);
 	for(i=0;i<256;i++)
 		if(i != globalMyID) //(although with a real broadcast you would also get the packet yourself)
 			sendto(globalSocketUDP, buf, length, 0,
 				  (struct sockaddr*)&globalNodeAddrs[i], sizeof(globalNodeAddrs[i]));
+	pthread_mutex_unlock(&sendToLock);
 }
 
 void send_pack(const char* buf, int length, int i)
 {
+	pthread_mutex_lock(&sendToLock);
 	if(i != globalMyID ) //(although with a real broadcast you would also get the packet yourself)
 		sendto(globalSocketUDP, buf, length, 0,
 			(struct sockaddr*)&globalNodeAddrs[i], sizeof(globalNodeAddrs[i]));
+	pthread_mutex_unlock(&sendToLock);
 }
 
 suseconds_t time_diff(struct timeval time1, struct timeval time2){
@@ -119,42 +124,44 @@ void* announceToNeighbors(void* unusedParam)
 {
 	struct timespec sleepLong;
 	sleepLong.tv_sec = 0;
-	sleepLong.tv_nsec = 150 * 1000 * 1000; //300 ms
+	sleepLong.tv_nsec = 120 * 1000 * 1000; //100 ms
 
-	struct timespec sleepShort;
-	sleepShort.tv_sec = 0;
-	sleepShort.tv_nsec = 100 * 1000 * 1000; //100 ms
-	int count = 0; 
+	while(1)
+	{
+		pthread_mutex_lock(&linkMsgLock);
+		char* msg = LinkMsg();
+		if (msg == NULL){
+			msg = "HEREIAM";
+		}
+		msg = strdup(msg);
+		pthread_mutex_unlock(&linkMsgLock);
+			
+		broadcast(msg, strlen(msg));
+		free(msg);
+		nanosleep(&sleepLong, 0);
+		check_neighbor();
+	}
+}
+
+void* distributeMessage(void* unusedParam)
+{
+	struct timespec sleep;
+	sleep.tv_sec = 0;
+	sleep.tv_nsec = 10 * 1000 * 1000; //10 ms
+
 	while(1)
 	{
 		msg_pack* pack = pullMsgChannel();
 		if (pack == NULL){
-			count++;
-			if(count % 2 == 0){
-				count = 0;
-				continue;
-			}
-			pthread_mutex_lock(&linkMsgLock);
-			char* msg = LinkMsg();
-			if (msg == NULL){
-				msg = "HEREIAM";
-			}
-			msg = strdup(msg);
-			pthread_mutex_unlock(&linkMsgLock);
-			
-			broadcast(msg, strlen(msg));
-			free(msg);
-			nanosleep(&sleepLong, 0);
+			// nanosleep(&sleep, 0);
 		} else {
 			if (pack -> dest != -1){
 				send_pack(pack -> msg, pack -> length, pack -> dest);
 			} else {
 				broadcast(pack -> msg, pack -> length);
-				// nanosleep(&sleepShort, 0);
 			}
 			free(pack);
 		}
-		check_neighbor();
 	}
 }
 
