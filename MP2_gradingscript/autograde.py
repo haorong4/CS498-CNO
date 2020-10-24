@@ -102,9 +102,9 @@ if __name__ == '__main__':
 	
 	shutil.copyfile("code.zip","results/code.zip")
 	
-	# for i in range(1,num_tests+1):
-	# 	run_test(i)
-	run_test(2)
+	for i in range(1,num_tests+1):
+		run_test(i)
+	# run_test(2)
 	if (os.path.isfile(output_zip+".zip")):		
 		os.remove(output_zip+".zip")
 	os.system("zip -r "+output_zip+" "+directory_results)

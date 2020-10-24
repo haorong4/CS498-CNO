@@ -50,7 +50,7 @@ void buildLinkMsg(){
         //     sprintf(temp, "%d-%d,", i, cost);
         // }
         sprintf(temp, "%d-%d,", i, cost);
-        log_test(temp);
+        // log_test(temp);
         strcat(buf, temp);
     }
     if (buf[strlen(buf)-1] == ','){
