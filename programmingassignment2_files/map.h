@@ -22,6 +22,7 @@ extern int globalMyID;
 extern char* logFile;
 extern char* costFile;
 extern int globalNodeNeighbor[256][256];
+extern int originCost[256];
 extern int timestamps[256];
 extern pthread_mutex_t linkMsgLock;
 
@@ -84,8 +85,8 @@ void dropLink(int dest){
 }
 
 // add a new neigbhor to the map.
-void addLink(int dest, int cost){
-    updateLink(globalMyID, dest, cost);
+void addLink(int dest){
+    updateLink(globalMyID, dest, originCost[dest]);
     buildLinkMsg();
     init_forward_table();//flush forward table
 }
@@ -122,6 +123,9 @@ int updateLinkFromMsg(char* message){
 }
 
 void initCost(char* _costFile){
+    for (int i = 0; i < 256; i++){
+        originCost[i] = 1;
+    }
     FILE *fp;
     fp = fopen(_costFile, "r+");
 
@@ -137,13 +141,15 @@ void initCost(char* _costFile){
 
         sscanf(my_string, "%d %d", &ID, &cost);
         // if (linkCost(globalMyID, ID) != 0){
-        updateLink(globalMyID, ID, cost);
+        // updateLink(globalMyID, ID, cost);
+        originCost[ID] = cost;
         // }
     }
     if (my_string != NULL){
         free(my_string);
     }
     fclose(fp);
+    originCost[globalMyID] = 0;
 }
 
 void initNeighbor(){

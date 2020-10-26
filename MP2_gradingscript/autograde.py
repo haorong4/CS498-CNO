@@ -65,6 +65,7 @@ def run_test(i):
 		process = Popen([program_name, cur_node,cur_cost,directory_results+"test"+str(i)+"_log"+str(nodeID)],stdout=sys.stdout,stderr=sys.stdout)
 		processes.append(process)
 
+	# time.sleep(5)
 	time.sleep(5)
 	for x in commands:
 		if (x):
@@ -102,9 +103,12 @@ if __name__ == '__main__':
 	
 	shutil.copyfile("code.zip","results/code.zip")
 	
+	# for i in range(1,6):
+	# 	run_test(i)
+	# run_test(2)
 	for i in range(1,num_tests+1):
 		run_test(i)
-	# run_test(2)
+
 	if (os.path.isfile(output_zip+".zip")):		
 		os.remove(output_zip+".zip")
 	os.system("zip -r "+output_zip+" "+directory_results)

@@ -90,9 +90,9 @@ void log_receive (char* message){
 }
 
 void log_test (char* message){
-   if(globalMyID != TARGET){
-     return;
-   }
+   // if(globalMyID != TARGET){
+   //   return;
+   // }
    FILE *fp;
    fp = fopen(logFile, "a+");
    fprintf(fp, "log message %s\n", message);
@@ -100,8 +100,14 @@ void log_test (char* message){
 }
 
 void log_matrix (int ID){
-   if(globalMyID != TARGET){
-     return;
+   // if(globalMyID != TARGET){
+   //   return;
+   // }
+   if (ID == -1){
+      for(int i = 0; i < 256; i++){
+         log_matrix(i);
+      }
+      return;
    }
    FILE *fp;
    fp = fopen(logFile, "a+");

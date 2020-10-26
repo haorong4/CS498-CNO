@@ -39,6 +39,8 @@ extern struct sockaddr_in globalNodeAddrs[256];
 
 extern int globalNodeNeighbor[256][256];
 
+int originCost[256];
+
 
 //TODO: add a lock to it;
 pthread_mutex_t duck = PTHREAD_MUTEX_INITIALIZER;
@@ -47,7 +49,7 @@ pthread_mutex_t sendToLock = PTHREAD_MUTEX_INITIALIZER;
 msg_pack *channel = NULL;
 msg_pack *channel_tail = NULL;
 
-suseconds_t dropTime = 500 * 1000 * 1000;  //700 ms 
+double dropTime = 900.0;  //700 ms 
 
 void pushMsgChannel(char* content, int dest, int length){
 	msg_pack* pack = calloc(1, sizeof(msg_pack));
@@ -82,26 +84,26 @@ msg_pack* pullMsgChannel(){
 void broadcast(const char* buf, int length)
 {
 	int i;
-	pthread_mutex_lock(&sendToLock);
+	// pthread_mutex_lock(&sendToLock);
 	for(i=0;i<256;i++)
 		if(i != globalMyID) //(although with a real broadcast you would also get the packet yourself)
 			sendto(globalSocketUDP, buf, length, 0,
 				  (struct sockaddr*)&globalNodeAddrs[i], sizeof(globalNodeAddrs[i]));
-	pthread_mutex_unlock(&sendToLock);
+	// pthread_mutex_unlock(&sendToLock);
 }
 
 void send_pack(const char* buf, int length, int i)
 {
-	pthread_mutex_lock(&sendToLock);
+	// pthread_mutex_lock(&sendToLock);
 	if(i != globalMyID ) //(although with a real broadcast you would also get the packet yourself)
 		sendto(globalSocketUDP, buf, length, 0,
 			(struct sockaddr*)&globalNodeAddrs[i], sizeof(globalNodeAddrs[i]));
-	pthread_mutex_unlock(&sendToLock);
+	// pthread_mutex_unlock(&sendToLock);
 }
 
-suseconds_t time_diff(struct timeval time1, struct timeval time2){
-	suseconds_t a = (time1.tv_sec - time2.tv_sec) * 1000;
-	a += (time1.tv_usec - time2.tv_usec);
+double time_diff(struct timeval time1, struct timeval time2){
+	double a = (time1.tv_sec - time2.tv_sec) * 1000 + (time1.tv_usec - time2.tv_usec)/1000;
+	// a += (time1.tv_usec - time2.tv_usec)/1000;
 	return a;
 }
 
@@ -110,9 +112,11 @@ int check_neighbor(){
 	for(int i = 0; i < 256; i++){
 		if(globalNodeNeighbor[globalMyID][i]){
 			gettimeofday(&cur_time, 0);
-			if (time_diff(cur_time, globalLastHeartbeat[i]) > dropTime){
+			double temp = time_diff(cur_time, globalLastHeartbeat[i]);
+			if (temp > dropTime){
 				// TODO: report failure;
 				// fprintf(stderr, "Fail to connected with %d", i);
+				// log_test("fail!!!!");
 				dropLink(i);
 			}
 		}
@@ -124,7 +128,7 @@ void* announceToNeighbors(void* unusedParam)
 {
 	struct timespec sleepLong;
 	sleepLong.tv_sec = 0;
-	sleepLong.tv_nsec = 120 * 1000 * 1000; //100 ms
+	sleepLong.tv_nsec = 300 * 1000 * 1000; //200 ms
 
 	while(1)
 	{
@@ -139,7 +143,6 @@ void* announceToNeighbors(void* unusedParam)
 		broadcast(msg, strlen(msg));
 		free(msg);
 		nanosleep(&sleepLong, 0);
-		check_neighbor();
 	}
 }
 
@@ -147,13 +150,14 @@ void* distributeMessage(void* unusedParam)
 {
 	struct timespec sleep;
 	sleep.tv_sec = 0;
-	sleep.tv_nsec = 10 * 1000 * 1000; //10 ms
+	sleep.tv_nsec = 5 * 1000 * 1000; //5 ms
 
 	while(1)
 	{
 		msg_pack* pack = pullMsgChannel();
 		if (pack == NULL){
-			// nanosleep(&sleep, 0);
+			check_neighbor();
+			nanosleep(&sleep, 0);
 		} else {
 			if (pack -> dest != -1){
 				send_pack(pack -> msg, pack -> length, pack -> dest);
@@ -194,10 +198,14 @@ void listenForNeighbors()
 			
 			//TODO: this is not very needed, remove it if nothing happens wrong.
 			if (linkCost(globalMyID, heardFrom) < 1){
-				addLink(heardFrom, 1);
+				addLink(heardFrom);
 			}
 			//record that we heard from heardFrom just now.
-			gettimeofday(&globalLastHeartbeat[heardFrom], 0);
+			struct timeval ttemp;
+
+			gettimeofday(&ttemp, 0);
+			// fprintf(stderr, "time diff between two %d: heart beat: %f ms \n",heardFrom, time_diff(ttemp, globalLastHeartbeat[heardFrom]));
+			globalLastHeartbeat[heardFrom] = ttemp;
 		}
 		// log_test("receive message from someone, starting to break message");
 		
@@ -220,6 +228,7 @@ void listenForNeighbors()
 
 			if (dest == NONE){
 				log_unreachable(task_ID);
+				// log_matrix(-1);
 				free(task_content);
 				free(recvCopy);
 				continue;
