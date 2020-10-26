@@ -49,7 +49,7 @@ pthread_mutex_t sendToLock = PTHREAD_MUTEX_INITIALIZER;
 msg_pack *channel = NULL;
 msg_pack *channel_tail = NULL;
 
-double dropTime = 900.0;  //700 ms 
+double dropTime = 1200.0;  //700 ms 
 
 void pushMsgChannel(char* content, int dest, int length){
 	msg_pack* pack = calloc(1, sizeof(msg_pack));
